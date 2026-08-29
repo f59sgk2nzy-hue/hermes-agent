@@ -63,11 +63,13 @@ impl ScriptKind {
     }
 }
 
-/// Validates a string looks like a git SHA (7+ hex chars). Mirrors
-/// `STAMP_COMMIT_RE` from bootstrap-runner.ts.
-fn is_valid_commit(s: &str) -> bool {
+/// Validates a string looks like a real git SHA (7+ hex chars), NOT the
+/// all-zero fallback placeholder used by packaged local builds.
+pub(crate) fn is_valid_commit(s: &str) -> bool {
     let len = s.len();
-    (7..=40).contains(&len) && s.chars().all(|c| c.is_ascii_hexdigit())
+    (7..=40).contains(&len)
+        && s.chars().all(|c| c.is_ascii_hexdigit())
+        && !s.chars().all(|c| c == '0')
 }
 
 /// Resolver cache plan for a pin that already has a local path computed.
@@ -402,6 +404,7 @@ mod tests {
         assert!(!is_valid_commit("02d269"));
         assert!(!is_valid_commit("not-a-sha"));
         assert!(!is_valid_commit(""));
+        assert!(!is_valid_commit("0000000000000000000000000000000000000000"));
     }
 
     #[test]

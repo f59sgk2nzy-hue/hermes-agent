@@ -1,0 +1,7 @@
+allowBuilds:
+  electron: set this to true or false
+  electron-winstaller: set this to true or false
+  esbuild: set this to true or false
+  get-windows: set this to true or false
+  node-pty: set this to true or false
+  unicode-animations: set this to true or false

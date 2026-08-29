@@ -263,11 +263,9 @@ pub(crate) fn hermes_is_installed(install_root: &std::path::Path) -> bool {
 }
 
 fn resolve_marker_commit(install_root: &Path, pin: &Pin) -> Option<String> {
-    if let Some(commit) = pin
-        .commit
-        .as_ref()
-        .filter(|commit| !commit.trim().is_empty())
-    {
+    if let Some(commit) = pin.commit.as_ref().filter(|commit| {
+        !commit.trim().is_empty() && crate::install_script::is_valid_commit(commit.trim())
+    }) {
         return Some(commit.clone());
     }
 
@@ -281,7 +279,7 @@ fn resolve_marker_commit(install_root: &Path, pin: &Pin) -> Option<String> {
     }
 
     let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if commit.is_empty() {
+    if commit.is_empty() || !crate::install_script::is_valid_commit(&commit) {
         None
     } else {
         Some(commit)
@@ -926,8 +924,11 @@ async fn run_install_script(
 fn build_pin_args(script: &install_script::ResolvedScript) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(c) = &script.commit {
-        out.push("-Commit".to_string());
-        out.push(c.clone());
+        let trimmed = c.trim();
+        if !trimmed.is_empty() && install_script::is_valid_commit(trimmed) {
+            out.push("-Commit".to_string());
+            out.push(trimmed.to_string());
+        }
     }
     if let Some(b) = &script.branch {
         out.push("-Branch".to_string());
@@ -1106,6 +1107,29 @@ mod tests {
             from_disk["completedAtUnix"].as_u64().is_some(),
             "marker must carry a completion timestamp"
         );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fallback_zero_commit_is_not_written_as_a_real_pin() {
+        let root = unique_tmp_dir("marker-zero-pin");
+        std::fs::create_dir_all(&root).unwrap();
+        let pin = Pin {
+            commit: Some("0000000000000000000000000000000000000000".to_string()),
+            branch: Some("main".to_string()),
+        };
+
+        let marker = write_bootstrap_complete_marker(&root, &pin).unwrap();
+        assert_eq!(marker["pinnedCommit"], serde_json::Value::Null);
+
+        let git = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&root)
+            .status()
+            .unwrap();
+        assert!(git.success(), "test repo should initialize successfully");
+        assert_eq!(resolve_marker_commit(&root, &pin), None);
+
         let _ = std::fs::remove_dir_all(&root);
     }
 
