@@ -79,4 +79,10 @@ it('renders known receipts as footnotes, without suppressing a red job', async (
   expect(failed).not.toContain('known [^1]')
   const passed = renderMarkdownResults([{ name: name + ' / e2e', conclusion: 'success' }])
   expect(passed).toContain('1 passed, 0 failed, 0 known failures')
+
+  const longA = legId('linux: installer-script+desktop -> hermes-desktop-app-update (v2026.8.31 -> HEAD)')
+  const longB = legId('linux: installer-script+desktop -> hermes-desktop-app-update (v2026.3.12 -> HEAD)')
+  expect(longA).toMatch(/^[A-Za-z0-9._-]+$/)
+  expect(longA.length).toBeLessThanOrEqual(64)
+  expect(longA).not.toBe(longB)
 })
