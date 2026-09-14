@@ -27,6 +27,7 @@
  */
 
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -79,16 +80,22 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * Artifact-safe key for one leg: the matrix name with every character
- * outside [A-Za-z0-9._-] collapsed to '-'. Reconstructed by the results
- * renderer from the parsed job name (same formula, same bytes), and used
- * by every run workflow to name its logs/player artifacts, so the report
- * job can map a concluded leg back to its artifacts without GitHub
- * linking jobs to artifacts.
+ * outside [A-Za-z0-9._-] collapsed to '-'. If the result is long, cap it
+ * with a deterministic hash suffix so artifact names stay well below
+ * backend limits while still mapping one-to-one back to the leg name.
+ * Reconstructed by the results renderer from the parsed job name (same
+ * formula, same bytes), and used by every run workflow to name its
+ * logs/player artifacts, so the report job can map a concluded leg back
+ * to its artifacts without GitHub linking jobs to artifacts.
  * @param {string} name
  * @returns {string}
  */
 export function legId(name) {
-  return name.replace(/[^A-Za-z0-9._-]+/g, '-');
+  const safe = name.replace(/[^A-Za-z0-9._-]+/g, '-');
+  const MAX = 64;
+  if (safe.length <= MAX) return safe;
+  const digest = createHash('sha256').update(safe).digest('hex').slice(0, 12);
+  return `${safe.slice(0, MAX - digest.length - 1)}-${digest}`;
 }
 
 /** @type {Record<Os, OsSpec>} */
